@@ -3,11 +3,8 @@ Scripts d'initialisation MySQL (voir https://hub.docker.com/_/mysql#initializing
 Les fichiers `*.sql`, `*.sql.gz` et `*.sh` de ce dossier sont exécutés par ordre alphabétique
 au **premier** démarrage du conteneur (volume vide) :
 
-- `01-schema.sql` : crée la table `mytable` ;
-- `02-import-data.sh` : importe les CSV déposés dans `data/`.
-
-Format CSV attendu (avec ligne d'en-tête) :
-`siren,date_creation_unite_legale,prenom_unite_legale,tranche_effectifs_unite_legale,etat_administratif_unite_legale,nom_unite_legale,denomination_unite_legale,activite_principale_unite_legale`
+- `01-StockUniteLegale_100000_utf8.sql` : dump SIRENE (crée `mytable` + 100 000 unités légales) ;
+- `02-normalize-schema.sql` : `siren` en CHAR(9) avec zéros en tête, colonnes élargies, index.
 
 Pour rejouer l'initialisation :
 
