@@ -10,12 +10,32 @@ security:
             entity:
                 class: App\Entity\User
                 property: email
+        keycloak_user_provider:
+            id: App\Security\KeycloakUserProvider
 
     firewalls:
         dev:
             # Ensure dev tools and static assets are always allowed
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
+        # API REST : OAuth2 / OIDC. Bearer JWT émis par Keycloak, signé en RS256 (clé asymétrique).
+        # Symfony récupère la clé publique via la discovery OIDC (.well-known/openid-configuration -> jwks_uri)
+        # et vérifie signature, issuer, audience et expiration à chaque requête.
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: keycloak_user_provider
+            access_token:
+                token_handler:
+                    oidc:
+                        claim: preferred_username
+                        audience: '%env(OIDC_AUDIENCE)%'
+                        issuers: ['%env(OIDC_ISSUER)%']
+                        algorithms: ['RS256']
+                        discovery:
+                            base_uri: '%env(OIDC_DISCOVERY_URI)%'
+                            cache:
+                                id: cache.app
         main:
             lazy: true
             provider: app_user_provider
@@ -28,6 +48,8 @@ security:
 
     # Note: Only the *first* matching rule is applied
     access_control:
+        - { path: ^/api/health$, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: IS_AUTHENTICATED }
         # - { path: ^/admin, roles: ROLE_ADMIN }
         # - { path: ^/profile, roles: ROLE_USER }
 

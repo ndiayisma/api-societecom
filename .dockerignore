@@ -1,0 +1,10 @@
+.git
+.idea
+vendor
+var
+node_modules
+public/bundles
+public/StockUniteLegale_100000_utf8.sql
+docker/mysql
+.env.local
+.env.*.local

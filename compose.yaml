@@ -1,4 +1,3 @@
-
 services:
 ###> doctrine/doctrine-bundle ###
   database:
@@ -20,6 +19,51 @@ services:
       # *.sql / *.sql.gz / *.sh files in this folder are executed once, on first start (empty volume)
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
 ###< doctrine/doctrine-bundle ###
+
+  # SSO OAuth2 / OpenID Connect : émet des access tokens JWT signés en RS256 (paire de clés RSA du realm)
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # URL publique => claim "iss" des tokens, identique quel que soit le client
+      KC_HOSTNAME: http://localhost:8080
+      # L'API (conteneur "app") joint Keycloak en interne via http://keycloak:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # API REST Symfony protégée par OAuth2 (Bearer JWT Keycloak)
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET:-change-me-in-production-0123456789}
+      DATABASE_URL: mysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-!ChangeMe!}@database:3306/${MYSQL_DATABASE:-societecom}?serverVersion=8.4.0&charset=utf8mb4
+      OIDC_ISSUER: http://localhost:8080/realms/societecom
+      OIDC_DISCOVERY_URI: http://keycloak:8080/realms/societecom/
+      OIDC_AUDIENCE: api-societecom
+    ports:
+      # 8001 par défaut : le 8000 est souvent pris par "symfony server:start"
+      - "${APP_PORT:-8001}:80"
+    depends_on:
+      database:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
 
 volumes:
 ###> doctrine/doctrine-bundle ###
